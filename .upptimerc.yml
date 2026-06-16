@@ -9,7 +9,7 @@ sites:
     url: https://app.honch.io
 
   - name: Honch Ingest
-    url: https://i.honch.io
+    url: https://i.honch.io/health
 
   - name: Honch Docs
     url: https://docs.honch.io
