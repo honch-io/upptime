@@ -1,7 +1,12 @@
 {
-  "generatedAt": null,
-  "freshnessSeconds": null,
-  "successRate24h": null,
-  "requestCount24h": null,
-  "history": []
+  "generatedAt": "2026-06-18T22:34:35.059Z",
+  "freshnessSeconds": 22398,
+  "successRate24h": 79.6,
+  "requestCount24h": 49,
+  "history": [
+    {
+      "date": "2026-06-18",
+      "successRate": 79.6
+    }
+  ]
 }
