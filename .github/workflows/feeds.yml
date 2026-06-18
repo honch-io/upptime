@@ -1,0 +1,50 @@
+#
+# Generates RSS + Atom incident feeds for the status page.
+# ---------------------------------------------------------------------------
+# Incidents are GitHub issues, so this regenerates status-page/feed.rss and
+# feed.atom whenever an issue changes (plus an hourly safety net). The commit
+# lands in status-page/, so the existing Deploy Status Page workflow publishes
+# the feeds to gh-pages → status.honch.io/feed.rss and /feed.atom.
+# ---------------------------------------------------------------------------
+name: Status Feeds
+on:
+  issues:
+    types: [opened, edited, closed, reopened, deleted, labeled, unlabeled]
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch:
+concurrency:
+  group: ${{ github.repository }}-${{ github.head_ref || github.ref_name }}-upptime
+  cancel-in-progress: false
+jobs:
+  build:
+    name: Build incident feeds
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+          token: ${{ secrets.GH_PAT || github.token }}
+      - name: Fetch incidents
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT || github.token }}
+        run: |
+          curl -sS --max-time 30 \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/issues?state=all&per_page=100" \
+            -o /tmp/issues.json || { echo "fetch failed; skipping."; exit 0; }
+      - name: Build feeds
+        run: node scripts/build-feeds.mjs /tmp/issues.json status-page
+      - name: Commit if changed
+        run: |
+          if git diff --quiet -- status-page/feed.rss status-page/feed.atom; then
+            echo "no change."
+            exit 0
+          fi
+          git config user.name "Upptime Bot"
+          git config user.email "73812536+upptime-bot@users.noreply.github.com"
+          git add status-page/feed.rss status-page/feed.atom
+          git commit -m "📰 Update status feeds"
+          git push
