@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Honch Status</title>
+    <link>https://status.honch.io</link>
+    <description>Incident history and status updates for Honch services</description>
+    <lastBuildDate>Tue, 16 Jun 2026 23:46:30 GMT</lastBuildDate>
+    <item>
+      <title>Honch Ingest is down</title>
+      <link>https://github.com/honch-io/upptime/issues/1</link>
+      <guid isPermaLink="true">https://github.com/honch-io/upptime/issues/1</guid>
+      <pubDate>Tue, 16 Jun 2026 22:37:01 GMT</pubDate>
+      <description>[Resolved] In [`f813ae5`](https://github.com/honch-io/upptime/commit/f813ae543d14d4b84b4e801fb9613163077c9bcd
+), Honch Ingest (https://is.honch.io) was **down**:
+- HTTP code: 502
+- Response time: 40 ms</description>
+    </item>
+  </channel>
+</rss>
