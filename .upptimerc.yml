@@ -13,11 +13,14 @@ sites:
 
   - name: Honch REST API
     url: https://api.honch.io/health
+    # Mark as degraded (not down) if the API is slow to respond.
+    maxResponseTime: 5000
 
   - name: Honch MCP Server
-    # /mcp itself requires auth (401 by design); this discovery endpoint is a
-    # public 200 health proxy for the same service.
-    url: https://api.honch.io/.well-known/oauth-protected-resource/mcp
+    # Dedicated unauthenticated liveness probe on the MCP server (returns 200).
+    url: https://api.honch.io/mcp/health
+    # Mark as degraded (not down) if MCP is slow to respond.
+    maxResponseTime: 5000
 
   - name: Honch Docs
     url: https://docs.honch.io
