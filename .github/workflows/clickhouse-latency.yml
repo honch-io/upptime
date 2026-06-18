@@ -1,0 +1,64 @@
+#
+# Snapshots ClickHouse query latency for the public status page.
+# ---------------------------------------------------------------------------
+# Every 30 min this fetches the backend's read-only aggregate endpoint
+# (GET /health/clickhouse-latency — percentiles only, no PII) and merges the
+# result into api/clickhouse-latency.json, accumulating a ~90-day daily P95
+# history. The status page reads that JSON at runtime (like summary.json).
+#
+# Required repo secrets:
+#   CLICKHOUSE_LATENCY_URL    full URL of the backend endpoint
+#                             (e.g. https://api.honch.io/health/clickhouse-latency)
+#   CLICKHOUSE_LATENCY_TOKEN  bearer token matching the backend's
+#                             CLICKHOUSE_LATENCY_TOKEN (optional but recommended)
+#
+# Fails safe: if the secret is unset or the fetch fails, the job exits cleanly
+# without modifying the committed history.
+# ---------------------------------------------------------------------------
+name: ClickHouse Latency Snapshot
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+concurrency:
+  group: ${{ github.repository }}-${{ github.head_ref || github.ref_name }}-upptime
+  cancel-in-progress: false
+jobs:
+  snapshot:
+    name: Snapshot query latency
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+          token: ${{ secrets.GH_PAT || github.token }}
+      - name: Fetch latency from backend
+        env:
+          URL: ${{ secrets.CLICKHOUSE_LATENCY_URL }}
+          TOKEN: ${{ secrets.CLICKHOUSE_LATENCY_TOKEN }}
+        run: |
+          if [ -z "$URL" ]; then
+            echo "CLICKHOUSE_LATENCY_URL not set; skipping."
+            exit 0
+          fi
+          curl -sS --max-time 30 -H "Authorization: Bearer $TOKEN" "$URL" -o /tmp/latency.json \
+            || { echo "fetch failed; leaving history unchanged."; rm -f /tmp/latency.json; exit 0; }
+      - name: Merge into history
+        run: |
+          if [ ! -f /tmp/latency.json ]; then
+            echo "no payload; skipping."
+            exit 0
+          fi
+          node scripts/merge-latency.mjs /tmp/latency.json api/clickhouse-latency.json
+      - name: Commit if changed
+        run: |
+          if git diff --quiet -- api/clickhouse-latency.json; then
+            echo "no change."
+            exit 0
+          fi
+          git config user.name "Upptime Bot"
+          git config user.email "73812536+upptime-bot@users.noreply.github.com"
+          git add api/clickhouse-latency.json
+          git commit -m "📊 Update ClickHouse query latency [skip ci]"
+          git push
