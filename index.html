@@ -237,6 +237,8 @@ footer a:hover{ color:var(--foreground); }
     <span class="k"><span class="sw" style="background:color-mix(in srgb, var(--muted-foreground) 22%, transparent)"></span>No data</span>
   </div>
 
+  <div id="ingestion-perf"></div>
+
   <div id="query-perf"></div>
 
   <div id="active-incident"></div>
@@ -283,6 +285,26 @@ const latencyColor = (ms) =>
   : ms < LATENCY_GOOD ? "var(--success)"
   : ms < LATENCY_WARN ? "var(--warning)"
   : "var(--destructive)";
+
+// Event-ingestion snapshot (committed by the ingestion-metrics workflow).
+const INGESTION_URL = `${RAW}/api/ingestion.json`;
+// Success-rate (%) thresholds for the headline color.
+const successColor = (pct) =>
+  pct == null ? "var(--muted-foreground)"
+  : pct >= 99.5 ? "var(--success)"
+  : pct >= 98 ? "var(--warning)"
+  : "var(--destructive)";
+// Freshness (seconds since last event) thresholds.
+const freshnessColor = (s) =>
+  s == null ? "var(--muted-foreground)"
+  : s < 60 ? "var(--success)"
+  : s < 600 ? "var(--warning)"
+  : "var(--destructive)";
+const fmtAgo = (s) =>
+  s == null ? "—"
+  : s < 90 ? `${Math.round(s)}s`
+  : s < 5400 ? `${Math.round(s/60)}m`
+  : `${Math.round(s/3600)}h`;
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const fmt      = (d) => `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`;
@@ -605,24 +627,22 @@ async function fetchLatency(){
   }
 }
 
-// Inline SVG sparkline of the daily P95 series. Returns "" if too few points.
-function buildSparkline(history){
-  const pts = (history || []).filter(d => d.p95 != null);
-  if (pts.length < 2) return "";
+// Inline SVG sparkline from a series of numbers. Returns "" if too few points.
+function sparkline(values, color, label){
+  const vals = (values || []).filter(v => v != null);
+  if (vals.length < 2) return "";
   const W = 600, H = 50, pad = 4;
-  const vals = pts.map(d => d.p95);
   const min = Math.min(...vals), max = Math.max(...vals);
   const span = max - min || 1;
-  const x = (i) => pad + (i * (W - 2*pad)) / (pts.length - 1);
+  const x = (i) => pad + (i * (W - 2*pad)) / (vals.length - 1);
   const y = (v) => pad + (1 - (v - min) / span) * (H - 2*pad);
-  const line = pts.map((d,i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(d.p95).toFixed(1)}`).join(" ");
+  const line = vals.map((v,i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
   const area = `M${x(0).toFixed(1)},${(H-pad).toFixed(1)} ` +
-    pts.map((d,i) => `L${x(i).toFixed(1)},${y(d.p95).toFixed(1)}`).join(" ") +
-    ` L${x(pts.length-1).toFixed(1)},${(H-pad).toFixed(1)} Z`;
-  const c = latencyColor(pts[pts.length-1].p95);
-  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="P95 query latency trend">
-      <path d="${area}" fill="${c}" opacity="0.10"/>
-      <path d="${line}" fill="none" stroke="${c}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+    vals.map((v,i) => `L${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ") +
+    ` L${x(vals.length-1).toFixed(1)},${(H-pad).toFixed(1)} Z`;
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${esc(label)}">
+      <path d="${area}" fill="${color}" opacity="0.10"/>
+      <path d="${line}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
     </svg>`;
 }
 
@@ -637,8 +657,9 @@ function renderQueryPerf(data){
       <div class="value" style="color:${latencyColor(v)}">${v == null ? "—" : v + " <span style='font-size:14px;font-weight:600'>ms</span>"}</div>
       <div class="sub">${esc(sub)}</div>
     </div>`;
-  const days = (data.history || []).filter(d => d.p95 != null).length;
-  const spark = buildSparkline(data.history);
+  const histVals = (data.history || []).filter(d => d.p95 != null).map(d => d.p95);
+  const days = histVals.length;
+  const spark = sparkline(histVals, latencyColor(histVals[histVals.length-1]), "P95 query latency trend");
   box.innerHTML = `
     <div class="section-head">
       <h2>Query performance</h2>
@@ -651,6 +672,58 @@ function renderQueryPerf(data){
     </div>
     <div class="panel spark" style="margin-top:14px">
       <div class="spark-head"><span class="t">P95 trend</span><span class="r">last ${days} day${days===1?"":"s"}</span></div>
+      ${spark || `<div class="empty-line">Collecting daily history — the trend appears once a few days of data accumulate.</div>`}
+    </div>`;
+}
+
+async function fetchIngestion(){
+  try{
+    const r = await fetch(INGESTION_URL, { cache:"no-store" });
+    if (!r.ok) throw new Error(r.status);
+    return await r.json();
+  }catch(e){
+    console.warn("ingestion.json unavailable", e);
+    return null;
+  }
+}
+
+function renderIngestion(data){
+  const box = el("ingestion-perf");
+  // Show once we have either a freshness reading or a success rate.
+  const hasData = data && (data.freshnessSeconds != null || data.successRate24h != null);
+  if (!hasData){ box.innerHTML = ""; return; }
+
+  const success = data.successRate24h;
+  const fresh = data.freshnessSeconds;
+  const reqs = data.requestCount24h;
+  const successCard = `
+    <div class="statcard">
+      <div class="label">Ingestion success</div>
+      <div class="value" style="color:${successColor(success)}">${success == null ? "—" : success + " <span style='font-size:14px;font-weight:600'>%</span>"}</div>
+      <div class="sub">${success == null ? "metrics unavailable" : (reqs != null ? `of ${reqs.toLocaleString()} events · last 24h` : "last 24h")}</div>
+    </div>`;
+  const freshCard = `
+    <div class="statcard">
+      <div class="label">Pipeline freshness</div>
+      <div class="value" style="color:${freshnessColor(fresh)}">${fmtAgo(fresh)}</div>
+      <div class="sub">${fresh == null ? "no recent events" : "since last event ingested"}</div>
+    </div>`;
+
+  const histVals = (data.history || []).filter(d => d.successRate != null).map(d => d.successRate);
+  const days = histVals.length;
+  const spark = sparkline(histVals, successColor(histVals[histVals.length-1]), "Ingestion success rate trend");
+
+  box.innerHTML = `
+    <div class="section-head">
+      <h2>Event ingestion</h2>
+      <span class="meta">capture · last 24h</span>
+    </div>
+    <div class="stats" style="grid-template-columns:repeat(2,1fr)">
+      ${successCard}
+      ${freshCard}
+    </div>
+    <div class="panel spark" style="margin-top:14px">
+      <div class="spark-head"><span class="t">Success rate trend</span><span class="r">last ${days} day${days===1?"":"s"}</span></div>
       ${spark || `<div class="empty-line">Collecting daily history — the trend appears once a few days of data accumulate.</div>`}
     </div>`;
 }
@@ -687,6 +760,7 @@ async function load(){
   renderIncidents(incidents);
 
   // query latency (independent of the above; hides itself if unavailable)
+  renderIngestion(await fetchIngestion());
   renderQueryPerf(await fetchLatency());
 }
 
