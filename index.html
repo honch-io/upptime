@@ -101,6 +101,14 @@ a{ color:inherit; }
 .statcard .value{ font-size:26px; font-weight:700; letter-spacing:-.025em; margin:6px 0 2px; line-height:1.05; }
 .statcard .sub{ font-size:12px; color:var(--muted-foreground); }
 
+/* ---- latency sparkline ---- */
+.spark{ padding:16px 22px; }
+.spark-head{ display:flex; align-items:baseline; justify-content:space-between; margin-bottom:10px; }
+.spark-head .t{ font-size:13px; font-weight:580; }
+.spark-head .r{ font-size:12px; color:var(--muted-foreground); }
+.spark svg{ display:block; width:100%; height:54px; overflow:visible; }
+.spark .empty-line{ font-size:12.5px; color:var(--muted-faint); padding:8px 0; }
+
 /* ---- generic section head ---- */
 .section-head{ display:flex; align-items:baseline; justify-content:space-between; margin:34px 0 13px; }
 .section-head h2{ font-size:13px; font-weight:650; text-transform:uppercase; letter-spacing:.07em; color:var(--muted-foreground); margin:0; }
@@ -229,6 +237,8 @@ footer a:hover{ color:var(--foreground); }
     <span class="k"><span class="sw" style="background:color-mix(in srgb, var(--muted-foreground) 22%, transparent)"></span>No data</span>
   </div>
 
+  <div id="query-perf"></div>
+
   <div id="active-incident"></div>
 
   <div class="section-head"><h2>Incident history</h2></div>
@@ -262,6 +272,17 @@ const HISTORY_DAYS = 90;
 // A day counts as a "major" bar once cumulative downtime crosses this many
 // minutes; anything down but below it shows as a partial degradation.
 const MAJOR_MINUTES = 240;
+
+// ClickHouse query-latency snapshot (committed by the clickhouse-latency workflow).
+const LATENCY_URL = `${RAW}/api/clickhouse-latency.json`;
+// P95 thresholds (ms) for coloring the headline latency figure.
+const LATENCY_GOOD = 500;
+const LATENCY_WARN = 2000;
+const latencyColor = (ms) =>
+  ms == null ? "var(--muted-foreground)"
+  : ms < LATENCY_GOOD ? "var(--success)"
+  : ms < LATENCY_WARN ? "var(--warning)"
+  : "var(--destructive)";
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const fmt      = (d) => `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`;
@@ -572,6 +593,68 @@ function renderIncidents(incidents){
   }).join("");
 }
 
+/* ---------- query latency ---------- */
+async function fetchLatency(){
+  try{
+    const r = await fetch(LATENCY_URL, { cache:"no-store" });
+    if (!r.ok) throw new Error(r.status);
+    return await r.json();
+  }catch(e){
+    console.warn("clickhouse-latency.json unavailable", e);
+    return null;
+  }
+}
+
+// Inline SVG sparkline of the daily P95 series. Returns "" if too few points.
+function buildSparkline(history){
+  const pts = (history || []).filter(d => d.p95 != null);
+  if (pts.length < 2) return "";
+  const W = 600, H = 50, pad = 4;
+  const vals = pts.map(d => d.p95);
+  const min = Math.min(...vals), max = Math.max(...vals);
+  const span = max - min || 1;
+  const x = (i) => pad + (i * (W - 2*pad)) / (pts.length - 1);
+  const y = (v) => pad + (1 - (v - min) / span) * (H - 2*pad);
+  const line = pts.map((d,i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(d.p95).toFixed(1)}`).join(" ");
+  const area = `M${x(0).toFixed(1)},${(H-pad).toFixed(1)} ` +
+    pts.map((d,i) => `L${x(i).toFixed(1)},${y(d.p95).toFixed(1)}`).join(" ") +
+    ` L${x(pts.length-1).toFixed(1)},${(H-pad).toFixed(1)} Z`;
+  const c = latencyColor(pts[pts.length-1].p95);
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="P95 query latency trend">
+      <path d="${area}" fill="${c}" opacity="0.10"/>
+      <path d="${line}" fill="none" stroke="${c}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+    </svg>`;
+}
+
+function renderQueryPerf(data){
+  const box = el("query-perf");
+  // Hide entirely until there's real data — never break the rest of the page.
+  if (!data || !data.last24h || !data.last24h.count){ box.innerHTML = ""; return; }
+  const l = data.last24h;
+  const card = (label, v, sub) => `
+    <div class="statcard">
+      <div class="label">${esc(label)}</div>
+      <div class="value" style="color:${latencyColor(v)}">${v == null ? "—" : v + " <span style='font-size:14px;font-weight:600'>ms</span>"}</div>
+      <div class="sub">${esc(sub)}</div>
+    </div>`;
+  const days = (data.history || []).filter(d => d.p95 != null).length;
+  const spark = buildSparkline(data.history);
+  box.innerHTML = `
+    <div class="section-head">
+      <h2>Query performance</h2>
+      <span class="meta">ClickHouse · last 24h · ${l.count.toLocaleString()} queries</span>
+    </div>
+    <div class="stats" style="grid-template-columns:repeat(3,1fr)">
+      ${card("Median (P50)", l.p50, "typical query")}
+      ${card("P95", l.p95, "95% of queries faster")}
+      ${card("P99", l.p99, "99% of queries faster")}
+    </div>
+    <div class="panel spark" style="margin-top:14px">
+      <div class="spark-head"><span class="t">P95 trend</span><span class="r">last ${days} day${days===1?"":"s"}</span></div>
+      ${spark || `<div class="empty-line">Collecting daily history — the trend appears once a few days of data accumulate.</div>`}
+    </div>`;
+}
+
 /* ---------- orchestration ---------- */
 async function load(){
   const now = new Date();
@@ -602,6 +685,9 @@ async function load(){
   renderStats(services, openCount);
   renderActiveIncident(incidents);
   renderIncidents(incidents);
+
+  // query latency (independent of the above; hides itself if unavailable)
+  renderQueryPerf(await fetchLatency());
 }
 
 load();
