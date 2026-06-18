@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Honch Status</title>
+  <subtitle>Incident history and status updates for Honch services</subtitle>
+  <link href="https://status.honch.io/feed.atom" rel="self"/>
+  <link href="https://status.honch.io"/>
+  <id>https://status.honch.io/</id>
+  <updated>2026-06-16T23:46:30Z</updated>
+  <entry>
+    <title>Honch Ingest is down</title>
+    <link href="https://github.com/honch-io/upptime/issues/1"/>
+    <id>https://github.com/honch-io/upptime/issues/1</id>
+    <published>2026-06-16T22:37:01Z</published>
+    <updated>2026-06-16T23:46:30Z</updated>
+    <summary>[Resolved] In [`f813ae5`](https://github.com/honch-io/upptime/commit/f813ae543d14d4b84b4e801fb9613163077c9bcd
+), Honch Ingest (https://is.honch.io) was **down**:
+- HTTP code: 502
+- Response time: 40 ms</summary>
+  </entry>
+</feed>
