@@ -1,5 +1,16 @@
 {
-  "generatedAt": null,
-  "last24h": { "p50": null, "p95": null, "p99": null, "count": 0 },
-  "history": []
+  "generatedAt": "2026-06-18T22:07:54.380Z",
+  "last24h": {
+    "p50": 11,
+    "p95": 37,
+    "p99": 38,
+    "count": 25
+  },
+  "history": [
+    {
+      "date": "2026-06-18",
+      "p95": 37,
+      "count": 25
+    }
+  ]
 }
