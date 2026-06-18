@@ -14,6 +14,15 @@ sites:
   - name: Honch Docs
     url: https://docs.honch.io
 
+# Down/up alerts. Upptime posts to Slack automatically when a service goes
+# down and again when it recovers. Inert until the repo secrets below are set:
+#   NOTIFICATION_SLACK             = true
+#   NOTIFICATION_SLACK_WEBHOOK     = true
+#   NOTIFICATION_SLACK_WEBHOOK_URL = <your Slack incoming-webhook URL>
+notifications:
+  - type: slack
+    webhookUrl: $NOTIFICATION_SLACK_WEBHOOK_URL
+
 status-website:
   cname: status.honch.io
 

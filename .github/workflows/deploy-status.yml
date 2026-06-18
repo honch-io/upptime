@@ -1,0 +1,54 @@
+#
+# Custom Honch status page deploy.
+# ---------------------------------------------------------------------------
+# This REPLACES Upptime's default `site.yml` (the Sapper/Svelte template build).
+# It publishes the hand-built status page in `status-page/` — which matches the
+# Honch design system and reads Upptime's own data at runtime — to gh-pages.
+#
+# All of Upptime's data-collection workflows (uptime, response-time, graphs,
+# summary, updates) are untouched and keep committing data to `master`.
+# Our page fetches that data client-side, so nothing about the "backend" changes.
+#
+# NOTE: `update-template.yml` has been disabled so the template generator can no
+# longer overwrite this file or resurrect `site.yml`. Re-enabling it will undo
+# this customization.
+# ---------------------------------------------------------------------------
+name: Deploy Status Page
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - "status-page/**"
+      - ".github/workflows/deploy-status.yml"
+  # The data workflows fire this dispatch after committing new results; we listen
+  # so the page redeploys on the same cadence the default template would have.
+  repository_dispatch:
+    types: [static_site]
+  schedule:
+    - cron: "0 1 * * *"
+  workflow_dispatch:
+concurrency:
+  group: ${{ github.repository }}-${{ github.head_ref || github.ref_name }}-upptime
+  cancel-in-progress: false
+jobs:
+  deploy:
+    name: Build and deploy custom status page
+    runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+          token: ${{ secrets.GH_PAT || github.token }}
+      - name: Add custom domain (CNAME)
+        run: echo "status.honch.io" > status-page/CNAME
+      - uses: peaceiris/actions-gh-pages@v4
+        name: GitHub Pages Deploy
+        with:
+          github_token: ${{ secrets.GH_PAT || github.token }}
+          publish_dir: "status-page"
+          force_orphan: "false"
+          user_name: "Upptime Bot"
+          user_email: "73812536+upptime-bot@users.noreply.github.com"
