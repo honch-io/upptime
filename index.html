@@ -63,8 +63,8 @@ a{ color:inherit; }
   box-shadow:0 1px 2px rgba(0,0,0,.16); display:block;
 }
 .mark img{ width:100%; height:100%; object-fit:cover; display:block; }
-.brand-name{ font-weight:650; font-size:15px; letter-spacing:-.01em; color:var(--foreground); }
-.brand-sub{ color:var(--muted-foreground); font-size:13px; font-weight:500; }
+.brand-name{ font-weight:650; font-size:15px; letter-spacing:-.01em; color:var(--foreground); line-height:1.2; }
+.brand-sub{ color:var(--muted-foreground); font-size:13px; font-weight:500; line-height:1.2; }
 
 /* ---- Button (HonchUI: outline / sm) ---- */
 .btn{
@@ -111,7 +111,7 @@ a{ color:inherit; }
 
 /* ---- generic section head ---- */
 .section-head{ display:flex; align-items:baseline; justify-content:space-between; margin:34px 0 13px; }
-.section-head h2{ font-size:13px; font-weight:650; text-transform:uppercase; letter-spacing:.07em; color:var(--muted-foreground); margin:0; }
+.section-head h2{ font-size:14px; font-weight:650; letter-spacing:-.01em; color:var(--foreground); margin:0; }
 .section-head .meta{ font-size:12.5px; color:var(--muted-foreground); }
 
 /* ---- services panel ---- */
@@ -171,7 +171,7 @@ a{ color:inherit; }
 .inc-affect{ color:var(--muted-foreground); font-size:12.5px; margin:5px 0 0; }
 .updates{ margin:14px 0 0; display:flex; flex-direction:column; gap:14px; }
 .upd{ display:grid; grid-template-columns:108px 1fr; gap:14px; }
-.upd .stage{ font-size:12px; font-weight:650; text-transform:uppercase; letter-spacing:.04em; }
+.upd .stage{ font-size:12px; font-weight:650; text-transform:capitalize; }
 .upd.resolved .stage{ color:var(--success-foreground); }
 .upd.monitoring .stage{ color:var(--info-foreground); }
 .upd.identified .stage, .upd.investigating .stage, .upd.update .stage{ color:var(--warning-foreground); }
