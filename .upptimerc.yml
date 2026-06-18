@@ -17,8 +17,11 @@ sites:
     maxResponseTime: 5000
 
   - name: Honch MCP Server
-    # Dedicated unauthenticated liveness probe on the MCP server (returns 200).
-    url: https://api.honch.io/mcp/health
+    # MCP is part of the backend; hit the real endpoint. Unauthenticated requests
+    # get 401 by design, so treat 401 as healthy (server up + enforcing auth).
+    url: https://api.honch.io/mcp
+    expectedStatusCodes:
+      - 401
     # Mark as degraded (not down) if MCP is slow to respond.
     maxResponseTime: 5000
 
