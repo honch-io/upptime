@@ -11,6 +11,14 @@ sites:
   - name: Honch Ingest
     url: https://i.honch.io/health
 
+  - name: Honch REST API
+    url: https://api.honch.io/health
+
+  - name: Honch MCP Server
+    # /mcp itself requires auth (401 by design); this discovery endpoint is a
+    # public 200 health proxy for the same service.
+    url: https://api.honch.io/.well-known/oauth-protected-resource/mcp
+
   - name: Honch Docs
     url: https://docs.honch.io
 

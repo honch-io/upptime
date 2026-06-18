@@ -1,0 +1,55 @@
+#
+# Snapshots event-ingestion health for the public status page.
+# ---------------------------------------------------------------------------
+# Every 30 min this fetches the backend's read-only GET /health/ingestion
+# (pipeline freshness + capture success rate — anonymous aggregates) and merges
+# it into api/ingestion.json, accumulating a 90-day daily success-rate history.
+# The status page reads that JSON at runtime.
+#
+# Reuses the existing CLICKHOUSE_LATENCY_TOKEN secret (same guard on both metric
+# endpoints). The endpoint URL is public, so it's inlined here. Fails safe:
+# unset token or failed fetch leaves the committed history unchanged.
+# ---------------------------------------------------------------------------
+name: Ingestion Metrics Snapshot
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+concurrency:
+  group: ${{ github.repository }}-${{ github.head_ref || github.ref_name }}-upptime
+  cancel-in-progress: false
+jobs:
+  snapshot:
+    name: Snapshot ingestion metrics
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+          token: ${{ secrets.GH_PAT || github.token }}
+      - name: Fetch ingestion metrics from backend
+        env:
+          TOKEN: ${{ secrets.CLICKHOUSE_LATENCY_TOKEN }}
+        run: |
+          curl -sS --max-time 30 -H "Authorization: Bearer $TOKEN" \
+            "https://api.honch.io/health/ingestion" -o /tmp/ingestion.json \
+            || { echo "fetch failed; leaving history unchanged."; rm -f /tmp/ingestion.json; exit 0; }
+      - name: Merge into history
+        run: |
+          if [ ! -f /tmp/ingestion.json ]; then
+            echo "no payload; skipping."
+            exit 0
+          fi
+          node scripts/merge-ingestion.mjs /tmp/ingestion.json api/ingestion.json
+      - name: Commit if changed
+        run: |
+          if git diff --quiet -- api/ingestion.json; then
+            echo "no change."
+            exit 0
+          fi
+          git config user.name "Upptime Bot"
+          git config user.email "73812536+upptime-bot@users.noreply.github.com"
+          git add api/ingestion.json
+          git commit -m "📥 Update event-ingestion metrics [skip ci]"
+          git push
