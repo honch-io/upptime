@@ -17,11 +17,9 @@ sites:
     maxResponseTime: 5000
 
   - name: Honch MCP Server
-    # Hit the real MCP endpoint. Unauthenticated requests get 401 by design,
-    # so we treat 401 as healthy — it proves the server is up and enforcing auth.
-    url: https://api.honch.io/mcp
-    expectedStatusCodes:
-      - 401
+    # Dedicated unauthenticated liveness probe on the MCP server (returns 200).
+    url: https://api.honch.io/mcp/health
+    # Mark as degraded (not down) if MCP is slow to respond.
     maxResponseTime: 5000
 
   - name: Honch Docs
