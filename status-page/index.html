@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Honch — System Status</title>
+<title>Honch Status</title>
 <meta name="description" content="Live status and uptime monitoring for Honch services.">
 <link rel="icon" type="image/svg+xml" href="logo.svg">
 
@@ -512,7 +512,7 @@ function renderHero(services, now){
       </div>
     </div>`;
   el("foot-status").innerHTML = `${esc(title)} · All times UTC · Powered by <a href="https://upptime.js.org" target="_blank" rel="noopener">Upptime</a>`;
-  document.title = `${worst===0?"✓":"●"} Honch — System Status`;
+  document.title = "Honch Status";
 }
 
 function renderStats(services, openCount){
