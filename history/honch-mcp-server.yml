@@ -1,7 +1,7 @@
-url: https://api.honch.io/.well-known/oauth-protected-resource/mcp
+url: https://api.honch.io/mcp
 status: up
-code: 200
-responseTime: 93
-lastUpdated: 2026-06-18T22:34:18.317Z
+code: 401
+responseTime: 227
+lastUpdated: 2026-06-19T00:21:05.092Z
 startTime: 2026-06-18T22:34:18.222Z
 generator: Upptime <https://github.com/upptime/upptime>
