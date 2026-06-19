@@ -10,6 +10,31 @@
 
 ---
 
+## Status — updated 2026-06-19
+
+**Shipped ✅**
+- **Item 1 — honch.dev uptime** — live (`.upptimerc.yml`, "Honch CLI Installer").
+- **Item 4 — Worker + Pub/Sub backlog** — live. Backend `GET /health/pipeline` (platform), and `pipeline-metrics.yml` snapshot + Slack alert + the public "Ingestion pipeline" tile (upptime).
+
+**Foundation now in place — reuse for the rest:**
+- `platform/backend/src/core/monitoring/cloud-monitoring.ts` — `fetchTimeSeries(query)` + `latestValue(series)`. Any Cloud Monitoring metric (Items 5 & 6) is now just "a filter + a parse."
+- **Backend pattern:** a `modules/health/<x>.service.ts` (pure compute, unit-tested) wired into a token-guarded `app.get("/health/<x>")` in `app.ts`. Mirror `pipeline-health.service.ts` / `ingestion-metrics.service.ts`.
+- **Upptime pattern:** a `*-metrics.yml` workflow (curl the endpoint with `CLICKHOUSE_LATENCY_TOKEN` → commit `api/<x>.json` → Slack step on threshold via `NOTIFICATION_SLACK_WEBHOOK_URL`) + a `scripts/*-snapshot.mjs` (pure + node:test). Mirror `pipeline-metrics.yml` + `pipeline-snapshot.mjs`.
+- **Audience split:** keep raw numbers OUT of the committed public JSON — see `pipeline-snapshot.publicSnapshot` (state-word only) vs the internal `alertMessage`.
+- **Already set up:** `roles/monitoring.viewer` on `honch-runtime`; secrets `CLICKHOUSE_LATENCY_TOKEN` + `NOTIFICATION_SLACK_WEBHOOK_URL`.
+
+**Remaining (all internal Slack alerts; build by mirroring the foundation):**
+- **Item 2 — ClickHouse disk** — backend queries `system.disks` (free/total) + parts health via the existing CH client. ~0.5 day.
+- **Item 3 — Cohort recalc freshness** — backend queries Postgres `cohorts` (`max(last_calculated_at)`, stuck `is_calculating`). ~0.5 day.
+- **Item 5 — Cloud SQL capacity** — Cloud Monitoring `cloudsql.googleapis.com/database/*` via the shared helper. **One lookup first:** `gcloud sql instances list --project euphoric-fusion-498103-g7` for the instance id. ~0.5–1 day.
+- **Item 6 — Redis (Memorystore)** — Cloud Monitoring `redis.googleapis.com/stats/*` for `honch-redis` via the shared helper. ~0.5–1 day.
+
+Full per-item detail (data sources, thresholds, exact files) is in the sections below.
+
+**Also outstanding:** rotate `CLICKHOUSE_LATENCY_TOKEN` (it was shared in chat).
+
+---
+
 ## Global Constraints
 
 - **No new public exposure of sensitive internals.** Raw infra numbers (DB connection counts, disk %, queue depth) are **internal** — surfaced via Slack alerts / an authenticated internal view, never the public status page. The public page only ever shows customer-facing state (operational / degraded / outage) and already-public metrics.
