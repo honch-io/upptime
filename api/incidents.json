@@ -1,0 +1,24 @@
+{
+  "generatedAt": "2026-06-18T23:41:14.216Z",
+  "incidents": [
+    {
+      "number": 1,
+      "title": "🛑 Honch Ingest is down",
+      "state": "closed",
+      "body": "In [`f813ae5`](https://github.com/honch-io/upptime/commit/f813ae543d14d4b84b4e801fb9613163077c9bcd\n), Honch Ingest (https://is.honch.io) was **down**:\n- HTTP code: 502\n- Response time: 40 ms\n",
+      "created_at": "2026-06-16T22:37:01Z",
+      "closed_at": "2026-06-16T23:46:29Z",
+      "html_url": "https://github.com/honch-io/upptime/issues/1",
+      "labels": [
+        "status",
+        "honch-ingest"
+      ],
+      "commentsList": [
+        {
+          "body": "**Resolved:** Honch Ingest is back up in [`0747d02`](https://github.com/honch-io/upptime/commit/0747d02c16e6e98e35b369b5dfe5f25b9365c89a\n) after 1 hour, 9 minutes.",
+          "created_at": "2026-06-16T23:46:29Z"
+        }
+      ]
+    }
+  ]
+}
