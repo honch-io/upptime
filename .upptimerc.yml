@@ -28,6 +28,12 @@ sites:
   - name: Honch Docs
     url: https://docs.honch.io
 
+  - name: Honch CLI Installer
+    # honch.dev (Cloudflare Worker) serves the `curl honch.dev | sh` install
+    # script (200, text/x-shellscript) and the Go vanity import route.
+    url: https://honch.dev
+    maxResponseTime: 5000
+
 # Down/up alerts. Upptime posts to Slack automatically when a service goes
 # down and again when it recovers. Inert until the repo secrets below are set:
 #   NOTIFICATION_SLACK             = true
