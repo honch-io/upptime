@@ -366,6 +366,14 @@ const latencyColor = (ms) =>
 
 // Event-ingestion snapshot (committed by the ingestion-metrics workflow).
 const INGESTION_URL = `${RAW}/api/ingestion.json`;
+// Pipeline health (worker + Pub/Sub backlog), coarse state only.
+const PIPELINE_URL = `${RAW}/api/pipeline.json`;
+const PIPELINE_META = {
+  operational: { label: "Operational",    color: "var(--success)" },
+  degraded:    { label: "Degraded",       color: "var(--warning)" },
+  behind:      { label: "Falling behind",  color: "var(--destructive)" },
+  down:        { label: "Down",            color: "var(--destructive)" },
+};
 // Success-rate (%) thresholds for the headline color.
 const successColor = (pct) =>
   pct == null ? "var(--muted-foreground)"
@@ -765,45 +773,66 @@ async function fetchIngestion(){
   }
 }
 
-function renderIngestion(data){
+async function fetchPipeline(){
+  try{
+    const r = await fetch(PIPELINE_URL, { cache:"no-store" });
+    if (!r.ok) throw new Error(r.status);
+    return await r.json();
+  }catch(e){
+    console.warn("pipeline.json unavailable", e);
+    return null;
+  }
+}
+
+function renderIngestion(data, pipeline){
   const box = el("ingestion-perf");
-  // Show once we have either a freshness reading or a success rate.
-  const hasData = data && (data.freshnessSeconds != null || data.successRate24h != null);
-  if (!hasData){ box.innerHTML = ""; return; }
+  const pState = pipeline && PIPELINE_META[pipeline.state] ? pipeline.state : null;
+  const hasIngest = data && (data.freshnessSeconds != null || data.successRate24h != null);
+  // Show if we have ingestion metrics OR a known pipeline state.
+  if (!hasIngest && !pState){ box.innerHTML = ""; return; }
 
-  const success = data.successRate24h;
-  const fresh = data.freshnessSeconds;
-  const reqs = data.requestCount24h;
-  const successCard = `
-    <div class="statcard">
-      <div class="label">Ingestion success</div>
-      <div class="value" style="color:${successColor(success)}">${success == null ? "—" : success + " <span style='font-size:14px;font-weight:600'>%</span>"}</div>
-      <div class="sub">${success == null ? "metrics unavailable" : (reqs != null ? `of ${reqs.toLocaleString()} events · last 24h` : "last 24h")}</div>
-    </div>`;
-  const freshCard = `
-    <div class="statcard">
-      <div class="label">Pipeline freshness</div>
-      <div class="value" style="color:${freshnessColor(fresh)}">${fmtAgo(fresh)}</div>
-      <div class="sub">${fresh == null ? "no recent events" : "since last event ingested"}</div>
-    </div>`;
+  const cards = [];
+  if (pState){
+    const pm = PIPELINE_META[pState];
+    cards.push(`
+      <div class="statcard">
+        <div class="label">Ingestion pipeline</div>
+        <div class="value" style="color:${pm.color};font-size:20px">${esc(pm.label)}</div>
+        <div class="sub">worker &amp; queue</div>
+      </div>`);
+  }
+  if (hasIngest){
+    const success = data.successRate24h, fresh = data.freshnessSeconds, reqs = data.requestCount24h;
+    cards.push(`
+      <div class="statcard">
+        <div class="label">Ingestion success</div>
+        <div class="value" style="color:${successColor(success)}">${success == null ? "—" : success + " <span style='font-size:14px;font-weight:600'>%</span>"}</div>
+        <div class="sub">${success == null ? "metrics unavailable" : (reqs != null ? `of ${reqs.toLocaleString()} events · last 24h` : "last 24h")}</div>
+      </div>`);
+    cards.push(`
+      <div class="statcard">
+        <div class="label">Pipeline freshness</div>
+        <div class="value" style="color:${freshnessColor(fresh)}">${fmtAgo(fresh)}</div>
+        <div class="sub">${fresh == null ? "no recent events" : "since last event ingested"}</div>
+      </div>`);
+  }
 
-  const histVals = (data.history || []).filter(d => d.successRate != null).map(d => d.successRate);
+  const histVals = ((data && data.history) || []).filter(d => d.successRate != null).map(d => d.successRate);
   const days = histVals.length;
-  const spark = sparkline(histVals, successColor(histVals[histVals.length-1]), "Ingestion success rate trend");
+  const spark = hasIngest ? sparkline(histVals, successColor(histVals[histVals.length-1]), "Ingestion success rate trend") : "";
 
   box.innerHTML = `
     <div class="section-head">
       <h2>Event ingestion</h2>
       <span class="meta">capture · last 24h</span>
     </div>
-    <div class="stats" style="grid-template-columns:repeat(2,1fr)">
-      ${successCard}
-      ${freshCard}
+    <div class="stats" style="grid-template-columns:repeat(${cards.length},1fr)">
+      ${cards.join("")}
     </div>
-    <div class="panel spark" style="margin-top:14px">
+    ${hasIngest ? `<div class="panel spark" style="margin-top:14px">
       <div class="spark-head"><span class="t">Success rate trend</span><span class="r">last ${days} day${days===1?"":"s"}</span></div>
       ${spark || `<div class="empty-line">Collecting daily history — the trend appears once a few days of data accumulate.</div>`}
-    </div>`;
+    </div>` : ""}`;
 }
 
 /* ---------- orchestration ---------- */
@@ -838,7 +867,8 @@ async function load(){
   renderIncidents(incidents);
 
   // query latency (independent of the above; hides itself if unavailable)
-  renderIngestion(await fetchIngestion());
+  const [ingestionData, pipelineData] = await Promise.all([fetchIngestion(), fetchPipeline()]);
+  renderIngestion(ingestionData, pipelineData);
   renderQueryPerf(await fetchLatency());
 }
 

@@ -1,0 +1,59 @@
+#
+# Snapshots ingestion-pipeline health (worker + Pub/Sub backlog) for the status
+# page, and posts an internal Slack alert when the pipeline is behind/down.
+# ---------------------------------------------------------------------------
+# Fetches the backend's GET /health/pipeline every 5 min. The committed
+# api/pipeline.json is PUBLIC, so it holds only the coarse state word — the raw
+# backlog numbers go to the Slack alert (internal), never the public file.
+#
+# Reuses CLICKHOUSE_LATENCY_TOKEN (same guard on the metric endpoints) and
+# NOTIFICATION_SLACK_WEBHOOK_URL (same webhook as the up/down alerts).
+# ---------------------------------------------------------------------------
+name: Pipeline Metrics Snapshot
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+concurrency:
+  group: ${{ github.repository }}-${{ github.head_ref || github.ref_name }}-upptime
+  cancel-in-progress: false
+jobs:
+  snapshot:
+    name: Snapshot pipeline health
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+          token: ${{ secrets.GH_PAT || github.token }}
+      - name: Fetch pipeline health from backend
+        env:
+          TOKEN: ${{ secrets.CLICKHOUSE_LATENCY_TOKEN }}
+        run: |
+          curl -sS --max-time 30 -H "Authorization: Bearer $TOKEN" \
+            "https://api.honch.io/health/pipeline" -o /tmp/pipeline.json \
+            || { echo "fetch failed; leaving snapshot unchanged."; rm -f /tmp/pipeline.json; exit 0; }
+      - name: Update public snapshot + detect alert
+        run: |
+          if [ ! -f /tmp/pipeline.json ]; then echo "no payload; skipping."; exit 0; fi
+          node scripts/pipeline-snapshot.mjs /tmp/pipeline.json api/pipeline.json /tmp/pipeline-alert.txt
+      - name: Post Slack alert if behind/down
+        env:
+          WEBHOOK: ${{ secrets.NOTIFICATION_SLACK_WEBHOOK_URL }}
+        run: |
+          if [ -s /tmp/pipeline-alert.txt ] && [ -n "$WEBHOOK" ]; then
+            MSG="$(cat /tmp/pipeline-alert.txt)"
+            jq -n --arg t "$MSG" '{text:$t}' | curl -sS --max-time 20 -X POST -H "Content-type: application/json" -d @- "$WEBHOOK" >/dev/null \
+              && echo "alert posted to Slack" || echo "slack post failed (non-fatal)"
+          else
+            echo "no alert."
+          fi
+      - name: Commit if changed
+        run: |
+          if git diff --quiet -- api/pipeline.json; then echo "no change."; exit 0; fi
+          git config user.name "Upptime Bot"
+          git config user.email "73812536+upptime-bot@users.noreply.github.com"
+          git add api/pipeline.json
+          git commit -m "🩺 Update pipeline state [skip ci]"
+          git push
