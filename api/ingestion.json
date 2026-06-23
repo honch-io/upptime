@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-06-22T23:21:01.328Z",
-  "freshnessSeconds": 17593,
+  "generatedAt": "2026-06-23T01:30:45.630Z",
+  "freshnessSeconds": 25377,
   "successRate24h": 50,
   "requestCount24h": 24,
   "history": [
@@ -22,6 +22,10 @@
     },
     {
       "date": "2026-06-22",
+      "successRate": 50
+    },
+    {
+      "date": "2026-06-23",
       "successRate": 50
     }
   ]
