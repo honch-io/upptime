@@ -712,6 +712,67 @@ function sparkline(values, color, label){
     </svg>`;
 }
 
+const metricNumber = (value) => {
+  if (value == null || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+};
+
+const metricCount = (value) => {
+  const n = metricNumber(value);
+  return n != null && n >= 0 ? n : null;
+};
+
+const roundPercent = (value) => Math.round(value * 100) / 100;
+
+function summarizeIngestionWindow(data){
+  const allHistory = (data && data.history) || [];
+  const requestedDays = metricCount(data && data.summaryWindowDays);
+  const history = requestedDays ? allHistory.slice(-requestedDays) : allHistory;
+  const samples = history
+    .map((entry) => ({
+      successRate: metricNumber(entry && entry.successRate),
+      requestCount: metricCount(entry && entry.requestCount),
+    }))
+    .filter((entry) => entry.successRate != null);
+  const labelDays = samples.length || history.length;
+  const label = labelDays ? `last ${labelDays} day${labelDays === 1 ? "" : "s"}` : "last 24h";
+
+  const providedRate = metricNumber(data && data.successRateWindow);
+  if (providedRate != null) {
+    return { successRate: providedRate, label, history };
+  }
+
+  if (!samples.length) {
+    return {
+      successRate: metricNumber(data && data.successRate24h),
+      label,
+      history,
+    };
+  }
+
+  const hasCompleteCounts = samples.every((entry) => entry.requestCount != null && entry.requestCount > 0);
+  if (hasCompleteCounts) {
+    const totalRequests = samples.reduce((sum, entry) => sum + entry.requestCount, 0);
+    const successfulRequests = samples.reduce(
+      (sum, entry) => sum + (entry.successRate / 100) * entry.requestCount,
+      0,
+    );
+    return {
+      successRate: roundPercent((successfulRequests / totalRequests) * 100),
+      label,
+      history,
+    };
+  }
+
+  const average = samples.reduce((sum, entry) => sum + entry.successRate, 0) / samples.length;
+  return {
+    successRate: roundPercent(average),
+    label,
+    history,
+  };
+}
+
 function renderQueryPerf(data){
   const box = el("query-perf");
   // Hide entirely until there's real data — never break the rest of the page.
@@ -767,7 +828,8 @@ async function fetchPipeline(){
 function renderIngestion(data, pipeline){
   const box = el("ingestion-perf");
   const pState = pipeline && PIPELINE_META[pipeline.state] ? pipeline.state : null;
-  const success = data && data.successRate24h != null ? data.successRate24h : null;
+  const ingestionWindow = summarizeIngestionWindow(data);
+  const success = ingestionWindow.successRate;
   // Status + success rate — deliberately no event count or freshness (those
   // exposed traffic volume and barely moved). Hide if neither is available.
   if (!pState && success == null){ box.innerHTML = ""; return; }
@@ -787,18 +849,18 @@ function renderIngestion(data, pipeline){
       <div class="statcard">
         <div class="label">Ingestion success</div>
         <div class="value" style="color:${successColor(success)}">${success} <span style='font-size:14px;font-weight:600'>%</span></div>
-        <div class="sub">last 24h</div>
+        <div class="sub">${ingestionWindow.label}</div>
       </div>`);
   }
 
-  const histVals = ((data && data.history) || []).filter(d => d.successRate != null).map(d => d.successRate);
+  const histVals = ingestionWindow.history.filter(d => d.successRate != null).map(d => d.successRate);
   const days = histVals.length;
   const spark = success != null ? sparkline(histVals, successColor(histVals[histVals.length-1]), "Ingestion success rate trend") : "";
 
   box.innerHTML = `
     <div class="section-head">
       <h2>Event ingestion</h2>
-      <span class="meta">capture · last 24h</span>
+      <span class="meta">capture · ${ingestionWindow.label}</span>
     </div>
     <div class="stats" style="grid-template-columns:repeat(${cards.length},1fr)">
       ${cards.join("")}
