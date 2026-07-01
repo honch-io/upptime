@@ -12,8 +12,55 @@ const EMPTY = () => ({
   freshnessSeconds: null,
   successRate24h: null,
   requestCount24h: null,
+  successRateWindow: null,
+  requestCountWindow: null,
+  summaryWindowDays: MAX_DAYS,
   history: [],
 });
+
+const roundPercent = (value) => Math.round(value * 100) / 100;
+
+function numeric(value) {
+  if (value == null || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function requestCount(value) {
+  const n = numeric(value);
+  return n != null && n >= 0 ? n : null;
+}
+
+export function summarizeIngestionHistory(history, days = MAX_DAYS) {
+  const samples = (Array.isArray(history) ? history : [])
+    .slice(-days)
+    .map((entry) => ({
+      successRate: numeric(entry && entry.successRate),
+      requestCount: requestCount(entry && entry.requestCount),
+    }))
+    .filter((entry) => entry.successRate != null);
+
+  if (!samples.length) {
+    return { successRate: null, requestCount: null, days: 0 };
+  }
+
+  const hasCompleteCounts = samples.every((entry) => entry.requestCount != null && entry.requestCount > 0);
+  if (hasCompleteCounts) {
+    const totalRequests = samples.reduce((sum, entry) => sum + entry.requestCount, 0);
+    const successfulRequests = samples.reduce(
+      (sum, entry) => sum + (entry.successRate / 100) * entry.requestCount,
+      0,
+    );
+    return {
+      successRate: roundPercent((successfulRequests / totalRequests) * 100),
+      requestCount: totalRequests,
+      days: samples.length,
+    };
+  }
+
+  const average = samples.reduce((sum, entry) => sum + entry.successRate, 0) / samples.length;
+  return { successRate: roundPercent(average), requestCount: null, days: samples.length };
+}
 
 /** True when the payload is a usable backend response (not an error / failed fetch). */
 export function isValidPayload(p) {
@@ -27,19 +74,28 @@ export function mergeIngestion(existing, payload) {
   const history = base.history.slice();
   const day = payload.today;
   if (day && day.date) {
-    const entry = { date: day.date, successRate: day.successRate ?? null };
+    const entry = {
+      date: day.date,
+      successRate: day.successRate ?? null,
+      requestCount: requestCount(day.requestCount ?? payload.requestCount24h),
+    };
     const i = history.findIndex((h) => h.date === day.date);
     if (i >= 0) history[i] = entry;
     else history.push(entry);
   }
   history.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  const trimmedHistory = history.slice(-MAX_DAYS);
+  const summary = summarizeIngestionHistory(trimmedHistory);
 
   return {
     generatedAt: payload.generatedAt ?? base.generatedAt,
     freshnessSeconds: payload.freshnessSeconds ?? null,
     successRate24h: payload.successRate24h ?? null,
     requestCount24h: payload.requestCount24h ?? null,
-    history: history.slice(-MAX_DAYS),
+    successRateWindow: summary.successRate,
+    requestCountWindow: summary.requestCount,
+    summaryWindowDays: MAX_DAYS,
+    history: trimmedHistory,
   };
 }
 
@@ -67,5 +123,5 @@ if (isMain) {
     : EMPTY();
   const merged = mergeIngestion(existing, payload);
   writeFileSync(targetPath, JSON.stringify(merged, null, 2) + "\n");
-  console.log(`updated ${targetPath}: freshness=${merged.freshnessSeconds}s success=${merged.successRate24h}% (${merged.history.length} days)`);
+  console.log(`updated ${targetPath}: freshness=${merged.freshnessSeconds}s success=${merged.successRateWindow}%/${MAX_DAYS}d (${merged.history.length} days)`);
 }
