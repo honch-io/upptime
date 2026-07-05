@@ -16,7 +16,22 @@ const cleanTitle = (t) =>
 
 /** Build { rss, atom } XML strings from a list of GitHub issues. `now` is the build time (ISO). */
 export function buildFeeds(issues, now) {
-  const incidents = (issues || [])
+  // The GitHub issues endpoint returns an array on success, but on an HTTP
+  // error (401/403/404, rate limit) it returns an object like
+  // { message, documentation_url }. The search endpoint wraps results in
+  // { items: [...] }. Normalize both, and fail loudly on anything else so a
+  // bad fetch doesn't surface as a cryptic ".filter is not a function".
+  const list = Array.isArray(issues)
+    ? issues
+    : Array.isArray(issues?.items)
+      ? issues.items
+      : null;
+  if (!list) {
+    const detail = issues?.message ? `: ${issues.message}` : "";
+    throw new Error(`build-feeds: expected an array of issues${detail}`);
+  }
+
+  const incidents = list
     .filter((i) => !i.pull_request)
     .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
   const updated = incidents[0]?.updated_at || now;
@@ -75,7 +90,7 @@ ${rssItems}
 </rss>
 `;
 
-  return { rss, atom };
+  return { rss, atom, count: incidents.length };
 }
 
 // --- CLI ---
@@ -87,8 +102,8 @@ if (isMain) {
     process.exit(1);
   }
   const issues = JSON.parse(readFileSync(issuesPath, "utf8"));
-  const { rss, atom } = buildFeeds(issues, new Date().toISOString());
+  const { rss, atom, count } = buildFeeds(issues, new Date().toISOString());
   writeFileSync(`${outDir}/feed.rss`, rss);
   writeFileSync(`${outDir}/feed.atom`, atom);
-  console.log(`wrote feed.rss + feed.atom (${issues.filter((i) => !i.pull_request).length} incidents)`);
+  console.log(`wrote feed.rss + feed.atom (${count} incidents)`);
 }

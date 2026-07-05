@@ -61,3 +61,20 @@ test("empty incident list still yields valid feeds", () => {
   assert.ok(atom.includes("<feed") && atom.includes("</feed>"));
   assert.ok(rss.includes("<channel>") && rss.includes("</channel>"));
 });
+
+test("throws a clear error when handed a GitHub API error object, not an array", () => {
+  // What the /issues endpoint returns on 401/403/404 — a truthy object with no .filter.
+  const apiError = {
+    message: "API rate limit exceeded",
+    documentation_url: "https://docs.github.com/rest/overview/rate-limits",
+  };
+  assert.throws(
+    () => buildFeeds(apiError, "2026-06-18T16:00:00Z"),
+    /API rate limit exceeded/,
+  );
+});
+
+test("accepts the search API shape ({ items: [...] })", () => {
+  const { atom } = buildFeeds({ items: issues }, "2026-06-18T16:00:00Z");
+  assert.equal((atom.match(/<entry>/g) || []).length, 2);
+});
