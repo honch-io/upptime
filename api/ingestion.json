@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-08-09T09:39:39.032Z",
-  "freshnessSeconds": 1527701,
-  "successRate24h": 81.4,
-  "requestCount24h": 43,
-  "successRateWindow": 53.88,
+  "generatedAt": "2026-08-09T10:34:58.399Z",
+  "freshnessSeconds": 1531021,
+  "successRate24h": 85.7,
+  "requestCount24h": 42,
+  "successRateWindow": 53.96,
   "requestCountWindow": null,
   "summaryWindowDays": 90,
   "history": [
@@ -256,8 +256,8 @@
     },
     {
       "date": "2026-08-09",
-      "successRate": 81.4,
-      "requestCount": 43
+      "successRate": 85.7,
+      "requestCount": 42
     }
   ]
 }
