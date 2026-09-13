@@ -13,7 +13,7 @@
     "time": 483,
     "timeDay": 0,
     "timeWeek": 0,
-    "timeMonth": 527,
+    "timeMonth": 520,
     "timeYear": 483,
     "dailyMinutesDown": {}
   },
@@ -31,7 +31,7 @@
     "time": 303,
     "timeDay": 0,
     "timeWeek": 0,
-    "timeMonth": 267,
+    "timeMonth": 257,
     "timeYear": 303,
     "dailyMinutesDown": {}
   },
@@ -41,15 +41,15 @@
     "icon": "https://icons.duckduckgo.com/ip3/i.honch.io.ico",
     "slug": "honch-ingest",
     "status": "up",
-    "uptime": "99.94%",
+    "uptime": "99.95%",
     "uptimeDay": "100.00%",
     "uptimeWeek": "100.00%",
     "uptimeMonth": "100.00%",
-    "uptimeYear": "99.94%",
+    "uptimeYear": "99.95%",
     "time": 1393,
     "timeDay": 0,
     "timeWeek": 0,
-    "timeMonth": 1230,
+    "timeMonth": 1294,
     "timeYear": 1393,
     "dailyMinutesDown": {
       "2026-06-16": 69
@@ -69,7 +69,7 @@
     "time": 378,
     "timeDay": 0,
     "timeWeek": 0,
-    "timeMonth": 156,
+    "timeMonth": 155,
     "timeYear": 378,
     "dailyMinutesDown": {}
   },
@@ -87,7 +87,7 @@
     "time": 145,
     "timeDay": 0,
     "timeWeek": 0,
-    "timeMonth": 228,
+    "timeMonth": 237,
     "timeYear": 145,
     "dailyMinutesDown": {}
   },
@@ -105,7 +105,7 @@
     "time": 323,
     "timeDay": 0,
     "timeWeek": 0,
-    "timeMonth": 315,
+    "timeMonth": 323,
     "timeYear": 323,
     "dailyMinutesDown": {}
   },
@@ -123,7 +123,7 @@
     "time": 164,
     "timeDay": 0,
     "timeWeek": 0,
-    "timeMonth": 171,
+    "timeMonth": 175,
     "timeYear": 164,
     "dailyMinutesDown": {}
   }
