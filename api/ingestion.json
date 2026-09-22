@@ -1,16 +1,12 @@
 {
-  "generatedAt": "2026-09-21T23:58:38.558Z",
-  "freshnessSeconds": 5294441,
+  "generatedAt": "2026-09-22T04:37:56.623Z",
+  "freshnessSeconds": 5311199,
   "successRate24h": 0,
-  "requestCount24h": 290,
-  "successRateWindow": 40.16,
+  "requestCount24h": 288,
+  "successRateWindow": 39.7,
   "requestCountWindow": null,
   "summaryWindowDays": 90,
   "history": [
-    {
-      "date": "2026-06-24",
-      "successRate": 41.4
-    },
     {
       "date": "2026-06-25",
       "successRate": 47.4
@@ -449,6 +445,11 @@
       "date": "2026-09-21",
       "successRate": 0,
       "requestCount": 290
+    },
+    {
+      "date": "2026-09-22",
+      "successRate": 0,
+      "requestCount": 288
     }
   ]
 }
